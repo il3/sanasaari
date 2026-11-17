@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sanasaari</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;800&display=swap">
+<style>
+/* Layout: merikartta. Kahdeksan saarta mutkittelevalla reitillä, pelinäkymässä vene ja viisi lastipaikkaa kysymyksen yllä. */
+:root {
+  --bg: #e9f3f4;
+  --surface: #ffffff;
+  --ink: #10303d;
+  --muted: #47636f;
+  --sea: #d3e8ec;
+  --sand: #ecd9a0;
+  --line: #b3d0d7;
+  --math: #0f766e;
+  --fin: #a3366b;
+  --on-isl: #ffffff;
+  --accent: #f2b705;
+  --accent-d: #a87c00;
+  --on-accent: #2a2100;
+  --ok: #2b8a3e;
+  --ok-bg: #dff5e3;
+  --hint-bg: #fff3c4;
+  --warn: #c2410c;
+  --star: #b45309;
+  --f-display: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
+  --f-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a1a22; --surface: #12303b; --ink: #e3f0f3; --muted: #9bb6bf; --sea: #0e2832;
+    --sand: #6f6236; --line: #25505e; --math: #3cc2b4; --fin: #ec7fb0; --on-isl: #06222a;
+    --accent-d: #f2b705; --ok: #5fd07a; --ok-bg: #123a22; --hint-bg: #3a3208; --warn: #ff9a62; --star: #ffd43b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a1a22; --surface: #12303b; --ink: #e3f0f3; --muted: #9bb6bf; --sea: #0e2832;
+  --sand: #6f6236; --line: #25505e; --math: #3cc2b4; --fin: #ec7fb0; --on-isl: #06222a;
+  --accent-d: #f2b705; --ok: #5fd07a; --ok-bg: #123a22; --hint-bg: #3a3208; --warn: #ff9a62; --star: #ffd43b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.5 var(--f-body);
+  padding-block: 18px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 520px; margin: 0 auto; }
+header.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 14px; }
+h1 { font: 600 2.1rem/1 var(--f-display); margin: 0; letter-spacing: .01em; }
+.sub { margin: 6px 0 0; color: var(--muted); font-size: .92rem; }
+.stats { font-weight: 800; font-size: .85rem; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.stats b { color: var(--ink); }
+.mapbox { background: var(--sea); border: 2px solid var(--line); border-radius: 18px; overflow: hidden; }
+svg.map { display: block; width: 100%; height: auto; }
+.wave { fill: none; stroke: var(--line); stroke-width: 2; stroke-linecap: round; }
+.route { fill: none; stroke: var(--muted); stroke-width: 2.5; stroke-dasharray: 1 8; stroke-linecap: round; opacity: .75; }
+.isl { cursor: pointer; outline: none; }
+.isl.locked { opacity: .5; cursor: not-allowed; }
+.isl-ring { fill: var(--sand); stroke: transparent; stroke-width: 4; }
+.isl:not(.locked):hover .isl-ring, .isl:focus-visible .isl-ring { stroke: var(--accent); }
+.isl-m { fill: var(--math); } .isl-f { fill: var(--fin); }
+.isl-num { font: 600 22px var(--f-display); fill: var(--on-isl); text-anchor: middle; }
+.isl-animal { font-size: 26px; text-anchor: middle; }
+.isl-name { font: 800 11.5px var(--f-body); fill: var(--ink); text-anchor: middle; }
+.isl-sub { font: 800 11px var(--f-body); fill: var(--muted); text-anchor: middle; letter-spacing: .04em; }
+.isl-star { font: 800 13px var(--f-body); fill: var(--star); text-anchor: middle; letter-spacing: 1px; }
+.boat-in { animation: bob 2.6s ease-in-out infinite; }
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.maphint { margin: 12px 0 0; color: var(--muted); font-size: .92rem; min-height: 1.5em; }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.btn { font: 800 1rem var(--f-body); background: var(--surface); color: var(--ink); border: 2px solid var(--line); border-radius: 12px; padding: 10px 16px; min-height: 44px; cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn:focus-visible, .choice:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.small { font-size: .85rem; min-height: 36px; padding: 6px 12px; }
+.chip { display: inline-block; font-weight: 800; font-size: .72rem; letter-spacing: .07em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; color: var(--on-isl); }
+.chip.m { background: var(--math); } .chip.f { background: var(--fin); }
+.isl-title { font: 600 1.5rem/1.2 var(--f-display); margin: 0 0 14px; }
+.deck { display: flex; gap: 8px; justify-content: center; }
+.slot { width: 46px; height: 46px; border: 2px dashed var(--line); border-radius: 6px; }
+.slot.on {
+  border: 2px solid var(--accent-d); background-color: var(--accent);
+  background-image: linear-gradient(var(--accent-d), var(--accent-d)), linear-gradient(var(--accent-d), var(--accent-d));
+  background-size: 100% 3px, 3px 100%; background-position: center; background-repeat: no-repeat;
+  animation: pop .35s ease-out;
+}
+@keyframes pop { 0% { transform: translateY(-14px) scale(.8); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.hull { height: 22px; width: min(100%, 340px); margin: 4px auto 0; background: var(--ink); opacity: .85; clip-path: polygon(0 0, 100% 0, 91% 100%, 9% 100%); }
+.card { background: var(--surface); border: 2px solid var(--line); border-radius: 16px; padding: 18px; margin-top: 18px; }
+.instr { margin: 0 0 6px; color: var(--muted); font-weight: 800; font-size: .8rem; letter-spacing: .05em; text-transform: uppercase; }
+.q { font: 500 1.28rem/1.4 var(--f-display); margin: 0 0 16px; overflow-wrap: anywhere; }
+.blank { display: inline-block; min-width: 3.6em; border-bottom: 3px solid var(--accent); }
+.choices { display: grid; gap: 10px; }
+.choice { font: 800 1.05rem var(--f-body); text-align: left; background: var(--bg); color: var(--ink); border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 48px; cursor: pointer; }
+.choice:hover:not(:disabled) { border-color: var(--muted); }
+.choice.wrong { border-color: var(--warn); opacity: .55; text-decoration: line-through; }
+.choice.right { border-color: var(--ok); background: var(--ok-bg); }
+.ansrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+input[type=text] { font: 800 1.4rem var(--f-body); width: 7.5em; max-width: 100%; padding: 8px 12px; border: 2px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); }
+.unit { font-weight: 800; color: var(--muted); }
+.fb { margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-weight: 600; border: 2px solid var(--line); }
+.fb:empty { display: none; }
+.fb.good { background: var(--ok-bg); border-color: var(--ok); }
+.fb.hint { background: var(--hint-bg); border-color: var(--accent); }
+.fb.reveal { border-color: var(--muted); }
+.nextrow { margin-top: 14px; }
+.done { text-align: center; }
+.done h2 { font: 600 1.6rem var(--f-display); margin: 4px 0 6px; }
+.animal { font-size: 4rem; line-height: 1.1; }
+.bigstars { font: 600 2.4rem/1.2 var(--f-display); color: var(--star); letter-spacing: 4px; }
+.muted { color: var(--muted); }
+.done .btn { margin: 6px 4px 0; }
+footer { margin-top: 26px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: .85rem; }
+@media (prefers-reduced-motion: reduce) { .boat-in, .slot.on { animation: none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Sanasaari</h1>
+      <p class="sub">Matikkaa ja suomen kieltä, 6. luokan tahtiin</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <section id="mapView">
+    <div class="mapbox"><svg class="map" id="map" viewBox="0 0 360 560" role="group" aria-label="Saaristokartta"></svg></div>
+    <p class="maphint" id="maphint">Napauta saarta. Vastaa oikein, niin vene täyttyy viidestä laatikosta ja seuraava saari aukeaa.</p>
+  </section>
+
+  <section id="gameView" hidden></section>
+
+  <footer>
+    <span>Edistyminen tallentuu tähän selaimeen.</span>
+    <button class="btn small" id="reset" type="button">Aloita alusta</button>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var KEY = 'sanasaari-v1';
+  var r = function (a, b) { return a + Math.floor(Math.random() * (b - a + 1)); };
+  var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
+  var shuffle = function (a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
+  var gcd = function (a, b) { return b ? gcd(b, a % b) : a; };
+  var frac = function (n, d) { var g = gcd(n, d); n /= g; d /= g; return d === 1 ? String(n) : n + '/' + d; };
+
+  /* ---------- Matikan tehtävät ---------- */
+  var MATH = {
+    kerto: function (d) {
+      if (d === 1) {
+        var a = r(12, 29), b = r(3, 9);
+        return { text: 'Veneeseen lastataan ' + a + ' laatikkoa. Jokaisessa on ' + b + ' kalaa. Montako kalaa on yhteensä?', answer: a * b, unit: 'kalaa',
+          hint: 'Jaa luku osiin: ' + a + ' × ' + b + ' = ' + (Math.floor(a / 10) * 10) + ' × ' + b + ' + ' + (a % 10) + ' × ' + b + '.' };
+      }
+      if (d === 2) {
+        var a2 = r(12, 25), b2 = r(11, 19);
+        return { text: 'Laske ' + a2 + ' × ' + b2 + '.', answer: a2 * b2,
+          hint: a2 + ' × ' + b2 + ' = ' + a2 + ' × 10 + ' + a2 + ' × ' + (b2 - 10) + '.' };
+      }
+      var k = r(6, 9), m = r(14, 60);
+      return { text: 'Kalastaja saa ' + (k * m) + ' kalaa ja pakkaa ne laatikoihin, ' + k + ' kalaa kuhunkin. Montako laatikkoa tarvitaan?', answer: m, unit: 'laatikkoa',
+        hint: 'Jakolasku on kertolaskun vastakohta. Etsi luku, jolla ' + k + ' kerrotaan: ' + k + ' × ? = ' + (k * m) + '.' };
+    },
+    murto: function (d) {
+      if (d === 1) {
+        var den = pick([2, 3, 4, 5, 10]), n = r(1, den - 1), w = den * r(2, 6);
+        return { text: 'Mikä on ' + n + '/' + den + ' luvusta ' + w + '?', answer: n * w / den,
+          hint: 'Jaa ' + w + ' ' + den + ' osaan: ' + w + ' ÷ ' + den + ' = ' + (w / den) + '. Kerro tulos luvulla ' + n + '.' };
+      }
+      var pool = d === 2
+        ? [[1, 2, 1, 4], [1, 2, 1, 8], [1, 3, 1, 6], [1, 4, 1, 8], [1, 5, 3, 10], [2, 3, 1, 6], [1, 2, 1, 10], [3, 4, 1, 8]]
+        : [[1, 3, 1, 4], [1, 2, 1, 3], [2, 3, 1, 4], [1, 4, 1, 5], [1, 6, 1, 4], [3, 4, 1, 6]];
+      var p = pick(pool), a = p[0], b = p[1], c = p[2], e = p[3];
+      var correct = frac(a * e + c * b, b * e);
+      var cands = [frac(a + c, b + e), frac(a + c, b * e), frac(a * e + c * b, b + e), frac(a * e + c * b + 1, b * e)];
+      var wr = []; cands.forEach(function (x) { if (x !== correct && wr.indexOf(x) < 0) wr.push(x); });
+      wr = shuffle(wr).slice(0, 2);
+      var lcm = b * e / gcd(b, e);
+      return { type: 'choice', text: 'Laske ' + a + '/' + b + ' + ' + c + '/' + e + '.', answer: correct, options: shuffle([correct].concat(wr)),
+        instr: 'Valitse sievennetty vastaus.',
+        hint: 'Lavenna murtoluvut samannimisiksi, esimerkiksi nimittäjään ' + lcm + '. Laske osoittajat yhteen ja sievennä.' };
+    },
+    prosentti: function (d) {
+      if (d === 1) {
+        var p = pick([10, 25, 50]), w = pick([40, 80, 120, 200, 240]);
+        var h = { 10: '10 % on kymmenesosa: jaa luku kymmenellä.', 25: '25 % on neljäsosa: jaa luku neljällä.', 50: '50 % on puolet luvusta.' };
+        return { text: 'Mikä on ' + p + ' % luvusta ' + w + '?', answer: w * p / 100, hint: h[p] };
+      }
+      if (d === 2) {
+        var p2 = pick([20, 30, 40, 75]), w2 = pick([40, 60, 80, 120, 160, 200, 240, 300]);
+        return { text: 'Mikä on ' + p2 + ' % luvusta ' + w2 + '?', answer: w2 * p2 / 100,
+          hint: 'Laske ensin 10 %, se on ' + (w2 / 10) + '. Sen avulla löydät ' + p2 + ' %.' };
+      }
+      var p0 = pick([40, 60, 80, 120, 160, 200, 240]), dc = pick([10, 20, 25, 30, 50]);
+      return { text: 'Pelastusliivi maksaa ' + p0 + ' €. Alennus on ' + dc + ' %. Mitä liivi maksaa alennuksen jälkeen?', answer: p0 - p0 * dc / 100, unit: '€',
+        hint: 'Laske ensin alennus: ' + dc + ' % luvusta ' + p0 + '. Vähennä se alkuperäisestä hinnasta.' };
+    },
+    pinta: function (d) {
+      if (d === 1) {
+        var a = r(4, 15), b = r(3, 12);
+        return { text: 'Saaren hiekkaranta on suorakulmio. Se on ' + a + ' m pitkä ja ' + b + ' m leveä. Mikä on sen pinta-ala?', answer: a * b, unit: 'm²',
+          hint: 'Suorakulmion pinta-ala on pituus × leveys.' };
+      }
+      if (d === 2) {
+        var a2 = r(5, 18), b2 = r(4, 13);
+        return { text: 'Aita kiertää suorakulmion muotoisen pihan. Piha on ' + a2 + ' m × ' + b2 + ' m. Kuinka pitkä aita tarvitaan?', answer: 2 * (a2 + b2), unit: 'm',
+          hint: 'Laske kaikki neljä sivua yhteen: ' + a2 + ' + ' + b2 + ' + ' + a2 + ' + ' + b2 + '.' };
+      }
+      var bs = pick([6, 8, 10, 12, 14]), hh = r(3, 9);
+      return { text: 'Kolmion muotoisen purjeen kanta on ' + bs + ' m ja korkeus ' + hh + ' m. Mikä on purjeen pinta-ala?', answer: bs * hh / 2, unit: 'm²',
+        hint: 'Kolmio on puolet suorakulmiosta: ' + bs + ' × ' + hh + ' ÷ 2.' };
+    }
+  };
+
+  /* ---------- Suomen kielen tehtävät: [teksti, oikea, väärä, väärä, vihje] ---------- */
+  var H_PAIKKA = 'Kysy: missä? mistä? mihin? Missä = -ssa/-ssä, mistä = -sta/-stä, mihin = -an/-en/-seen tms.';
+  var H_ULKO = 'Missä = -lla/-llä, mistä = -lta/-ltä, mihin = -lle.';
+  var FIN = {
+    sija: {
+      instr: 'Valitse oikea sijamuoto.',
+      1: [
+        ['Kala uiskentelee ___ (meri).', 'meressä', 'merestä', 'mereen', H_PAIKKA],
+        ['Vene lähtee ___ (satama).', 'satamasta', 'satamassa', 'satamaan', H_PAIKKA],
+        ['Kalastaja menee ___ (talo).', 'taloon', 'talossa', 'talosta', H_PAIKKA],
+        ['Kirja on ___ (laukku).', 'laukussa', 'laukusta', 'laukkuun', H_PAIKKA],
+        ['Otan avaimen ___ (tasku).', 'taskusta', 'taskussa', 'taskuun', H_PAIKKA],
+        ['Kiipeän ___ (vene).', 'veneeseen', 'veneessä', 'veneestä', H_PAIKKA]
+      ],
+      2: [
+        ['Kissa istuu ___ (pöytä).', 'pöydällä', 'pöydältä', 'pöydälle', H_ULKO],
+        ['Lintu lentää ___ (katto).', 'katolle', 'katolla', 'katolta', H_ULKO],
+        ['Otan kupin ___ (hylly).', 'hyllyltä', 'hyllyllä', 'hyllylle', H_ULKO],
+        ['Laitan kirjan ___ (hylly).', 'hyllylle', 'hyllyltä', 'hyllyllä', H_ULKO],
+        ['Lapset leikkivät ___ (ranta).', 'rannalla', 'rannalta', 'rannalle', H_ULKO],
+        ['Soitan ___ (ystävä).', 'ystävälle', 'ystävältä', 'ystävällä', H_ULKO]
+      ],
+      3: [
+        ['Ostin kolme ___ (omena).', 'omenaa', 'omenan', 'omenat', 'Lukusanan jälkeen tulee usein partitiivi (-a/-ä).'],
+        ['Näen kaksi ___ (kala).', 'kalaa', 'kalan', 'kalat', 'Lukusanan jälkeen tulee usein partitiivi (-a/-ä).'],
+        ['Lumi sulaa ___ (vesi).', 'vedeksi', 'vedessä', 'vetenä', 'Mikä siitä tulee? Muutos kertoo sijamuoto -ksi.'],
+        ['Hän toimii ___ (opettaja).', 'opettajana', 'opettajaksi', 'opettajaa', 'Toimii jonakin: -na/-nä.'],
+        ['Hänet valittiin ___ (kapteeni).', 'kapteeniksi', 'kapteenina', 'kapteenia', 'Valita joksikin: -ksi.'],
+        ['Rakastan ___ (musiikki).', 'musiikkia', 'musiikin', 'musiikkiin', 'Verbi rakastaa vaatii partitiivin.'],
+        ['Pidän ___ (jäätelö).', 'jäätelöstä', 'jäätelöä', 'jäätelössä', 'Pitää jostakin: -sta/-stä.']
+      ]
+    },
+    aste: {
+      instr: 'Valitse oikea muoto.',
+      1: [
+        ['Poimin ___ (kukka) puutarhasta.', 'kukan', 'kukkan', 'kuukan', 'Vahva kk heikkenee muotoon k.'],
+        ['Tämä on ___ (kauppa) ovi.', 'kaupan', 'kauppan', 'kauvan', 'Vahva pp heikkenee muotoon p.'],
+        ['Kirjoitan ___ (kortti).', 'kortin', 'korttin', 'kortiin', 'Vahva tt heikkenee muotoon t.'],
+        ['Näin ___ (tyttö) kadulla.', 'tytön', 'tyttön', 'tyttöön', 'Vahva tt heikkenee muotoon t.'],
+        ['Ostin ___ (hattu).', 'hatun', 'hattun', 'hatuun', 'Vahva tt heikkenee muotoon t.']
+      ],
+      2: [
+        ['Söin ___ (leipä).', 'leivän', 'leipän', 'leiän', 'Vahva p heikkenee muotoon v.'],
+        ['Vene on ___ (joki) rannalla.', 'joen', 'jokin', 'jokeen', 'Vahva k katoaa kokonaan.'],
+        ['Tämä on ___ (pöytä) jalka.', 'pöydän', 'pöytän', 'pöyän', 'Vahva t heikkenee muotoon d.'],
+        ['Talo on ___ (katu) varrella.', 'kadun', 'katun', 'kaun', 'Vahva t heikkenee muotoon d.'],
+        ['Isoisä kyntää ___ (pelto).', 'pellon', 'pelton', 'peltoon', 'Vahva lt heikkenee muotoon ll.']
+      ],
+      3: [
+        ['Tämä on ___ (kenkä) kärki.', 'kengän', 'kenkän', 'kengen', 'Vahva nk heikkenee muotoon ng.'],
+        ['Venevaja on ___ (ranta).', 'rannalla', 'rantalla', 'ranalla', 'Missä? Vahva nt heikkenee muotoon nn.'],
+        ['Ankka uiskentelee ___ (lampi) keskellä.', 'lammen', 'lampin', 'lamman', 'Vahva mp heikkenee muotoon mm.'],
+        ['Lääkäri tutkii ___ (hammas).', 'hampaan', 'hammaan', 'hammasen', 'Sana taipuu hampaan: mm muuttuu muotoon mp.'],
+        ['Tämä on ___ (sänky) peitto.', 'sängyn', 'sänkyn', 'säyn', 'Vahva nk heikkenee muotoon ng.']
+      ]
+    },
+    sana: {
+      instr: 'Valitse oikea vastaus.',
+      1: [
+        ['Valitse oikein kirjoitettu sana: jää + kaappi.', 'jääkaappi', 'jää kaappi', 'jäkaappi', 'Yhdyssana kirjoitetaan yhteen, ja kaksoiskirjaimet säilyvät.'],
+        ['Valitse oikein kirjoitettu sana: koulu + reppu.', 'koulureppu', 'koulu reppu', 'koulurepu', 'Yhdyssana kirjoitetaan yhteen, ja kaksoiskirjaimet säilyvät.'],
+        ['Valitse oikein kirjoitettu sana: kirjasto + kortti.', 'kirjastokortti', 'kirjasto kortti', 'kirjastokorti', 'Yhdyssana kirjoitetaan yhteen, ja kaksoiskirjaimet säilyvät.'],
+        ['Valitse oikein kirjoitettu sana: lento + kone.', 'lentokone', 'lento kone', 'lentokonne', 'Yhdyssana kirjoitetaan yhteen.'],
+        ['Valitse oikein kirjoitettu sana: jalka + pallo.', 'jalkapallo', 'jalka pallo', 'jalkapalo', 'Yhdyssana kirjoitetaan yhteen, ja kaksoiskirjaimet säilyvät.']
+      ],
+      2: [
+        ['Mikä sana on substantiivi? ”Iso koira juoksee nopeasti.”', 'koira', 'Iso', 'nopeasti', 'Substantiivi on nimi asialle, eläimelle tai henkilölle.'],
+        ['Mikä sana on verbi? ”Lapset leikkivät pihalla.”', 'leikkivät', 'Lapset', 'pihalla', 'Verbi kertoo, mitä tehdään.'],
+        ['Mikä sana on adjektiivi? ”Punainen vene keinuu.”', 'Punainen', 'vene', 'keinuu', 'Adjektiivi kertoo, millainen jokin on.'],
+        ['Mikä sana on adverbi? ”Hän lukee hitaasti.”', 'hitaasti', 'Hän', 'lukee', 'Adverbi kertoo, miten, missä tai milloin jokin tapahtuu.'],
+        ['Mikä sana on pronomini? ”Me rakennamme majan.”', 'Me', 'rakennamme', 'majan', 'Pronomini korvaa nimen: minä, sinä, hän, me, te, he.']
+      ],
+      3: [
+        ['Mikä on lauseen predikaatti? ”Lokki nappasi kalan.”', 'nappasi', 'Lokki', 'kalan', 'Predikaatti on verbi: mitä tehtiin?'],
+        ['Mikä on lauseen subjekti? ”Kapteeni kääntää ruorin.”', 'Kapteeni', 'kääntää', 'ruorin', 'Subjekti vastaa kysymykseen: kuka tai mikä tekee?'],
+        ['Mikä on lauseen objekti? ”Kapteeni kääntää ruorin.”', 'ruorin', 'Kapteeni', 'kääntää', 'Objekti vastaa kysymykseen: mitä tehdään?'],
+        ['Mikä on lauseen subjekti? ”Koira haukkuu kovaa.”', 'Koira', 'haukkuu', 'kovaa', 'Subjekti vastaa kysymykseen: kuka tai mikä tekee?'],
+        ['Mikä on lauseen objekti? ”Lapset syövät omenan.”', 'omenan', 'Lapset', 'syövät', 'Objekti vastaa kysymykseen: mitä tehdään?']
+      ]
+    },
+    verbi: {
+      instr: 'Valitse oikea verbin muoto.',
+      1: [
+        ['Eilen minä ___ (mennä) kouluun.', 'menin', 'menen', 'mennyt', 'Eilen tarkoittaa menneisyyttä. Käytä imperfektiä.'],
+        ['Eilen sinä ___ (olla) kotona.', 'olit', 'olet', 'ollut', 'Eilen tarkoittaa menneisyyttä. Käytä imperfektiä.'],
+        ['Eilen hän ___ (lukea) kirjaa kirjastossa.', 'luki', 'lukee', 'lukenut', 'Eilen tarkoittaa menneisyyttä. Käytä imperfektiä.']
+      ],
+      2: [
+        ['Eilen he ___ (syödä) kalaa.', 'söivät', 'syövät', 'syöneet', 'Imperfektissä monikon kolmas persoona päättyy usein -ivat/-ivät.'],
+        ['Eilen me ___ (tulla) myöhään.', 'tulimme', 'tulemme', 'tulleet', 'Imperfektin tunnus on usein i: tuli-mme.'],
+        ['Eilen lapset ___ (juosta) rannalle.', 'juoksivat', 'juoksevat', 'juosseet', 'Imperfektin tunnus on i: juoksi-vat.'],
+        ['Viime viikolla minä ___ (nähdä) hylkeen.', 'näin', 'näen', 'nähnyt', 'Imperfekti: nähdä → näin.']
+      ],
+      3: [
+        ['Eilen sinä ___ (nähdä) lokin rannalla.', 'näit', 'näet', 'nähnyt', 'Imperfekti: nähdä → näit.'],
+        ['Viime vuonna he ___ (tietää) tien saarelle.', 'tiesivät', 'tietävät', 'tienneet', 'Imperfekti: tietää → tiesi-vät.'],
+        ['Eilen me ___ (pestä) veneen laiturilla.', 'pesimme', 'pesemme', 'pessyt', 'Imperfektin tunnus on i: pesi-mme.'],
+        ['Eilen sinä ___ (antaa) vastauksen koulussa.', 'annoit', 'annat', 'antanut', 'Imperfekti: antaa → annoit.']
+      ]
+    }
+  };
+
+  function finGen(key, d, used) {
+    var set = FIN[key];
+    var free = function (lvl) { return (set[lvl] || []).filter(function (x) { return !used[x[0]]; }); };
+    var rows = free(d);
+    if (!rows.length) { rows = free(1).concat(free(2), free(3)); }
+    if (!rows.length) { rows = set[d]; }
+    var x = pick(rows);
+    return { type: 'choice', text: x[0], answer: x[1], options: shuffle([x[1], x[2], x[3]]), hint: x[4], instr: set.instr };
+  }
+
+  /* ---------- Saaret ---------- */
+  var ISL = [
+    { id: 'kerto', name: 'Kertosaari', subj: 'm', topic: 'Kerto- ja jakolasku', animal: '🐋', animalName: 'valas', x: 80, y: 490, gen: function (d) { return MATH.kerto(d); } },
+    { id: 'sija', name: 'Sijaranta', subj: 'f', topic: 'Sijamuodot', animal: '🐠', animalName: 'kala', x: 255, y: 440, gen: function (d, u) { return finGen('sija', d, u); } },
+    { id: 'murto', name: 'Murtolahti', subj: 'm', topic: 'Murtoluvut', animal: '🐧', animalName: 'pingviini', x: 90, y: 370, gen: function (d) { return MATH.murto(d); } },
+    { id: 'aste', name: 'Astesaari', subj: 'f', topic: 'Astevaihtelu', animal: '🐙', animalName: 'mustekala', x: 260, y: 310, gen: function (d, u) { return finGen('aste', d, u); } },
+    { id: 'pros', name: 'Prosenttivuori', subj: 'm', topic: 'Prosentit', animal: '🦆', animalName: 'ankka', x: 95, y: 250, gen: function (d) { return MATH.prosentti(d); } },
+    { id: 'sana', name: 'Sanasalmi', subj: 'f', topic: 'Yhdyssanat, sanaluokat ja lauseenjäsenet', animal: '🐬', animalName: 'delfiini', x: 260, y: 190, gen: function (d, u) { return finGen('sana', d, u); } },
+    { id: 'pinta', name: 'Pinta-alasaari', subj: 'm', topic: 'Pinta-ala ja piiri', animal: '🦀', animalName: 'rapu', x: 100, y: 130, gen: function (d) { return MATH.pinta(d); } },
+    { id: 'verbi', name: 'Verbisaari', subj: 'f', topic: 'Verbit menneessä ajassa', animal: '🐢', animalName: 'kilpikonna', x: 255, y: 70, gen: function (d, u) { return finGen('verbi', d, u); } }
+  ];
+  var NEED = 5, MAXROUNDS = 9;
+
+  /* ---------- Tallennus ---------- */
+  function load() {
+    try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s.done === 'object' && s.done) return s; } catch (e) {}
+    return { done: {} };
+  }
+  function persist() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
+  var save = load();
+  var isUnlocked = function (i) { return i === 0 || !!save.done[ISL[i - 1].id]; };
+  var starStr = function (n) { return '★★★'.slice(0, n) + '☆☆☆'.slice(0, 3 - n); };
+
+  var $ = function (s) { return document.querySelector(s); };
+  var mapView = $('#mapView'), gameView = $('#gameView'), mapEl = $('#map'), hintEl = $('#maphint');
+
+  /* ---------- Kartta ---------- */
+  function renderStats() {
+    var done = 0, stars = 0;
+    ISL.forEach(function (s) { if (save.done[s.id]) { done++; stars += save.done[s.id]; } });
+    $('#stats').innerHTML = 'Saaria <b>' + done + '/' + ISL.length + '</b><br>Tähtiä <b>' + stars + '/' + (ISL.length * 3) + '</b>';
+  }
+  function renderMap() {
+    renderStats();
+    var next = ISL.findIndex(function (s) { return !save.done[s.id]; });
+    var h = '';
+    for (var w = 0; w < 9; w++) {
+      var wx = 20 + ((w * 97) % 300), wy = 40 + ((w * 61) % 480);
+      h += '<path class="wave" d="M' + wx + ' ' + wy + ' q6 -5 12 0 t12 0"/>';
+    }
+    var d = 'M' + ISL[0].x + ' ' + ISL[0].y;
+    for (var i = 1; i < ISL.length; i++) {
+      var ym = (ISL[i - 1].y + ISL[i].y) / 2;
+      d += ' C' + ISL[i - 1].x + ' ' + ym + ' ' + ISL[i].x + ' ' + ym + ' ' + ISL[i].x + ' ' + ISL[i].y;
+    }
+    h += '<path class="route" d="' + d + '"/>';
+    ISL.forEach(function (s, idx) {
+      var locked = !isUnlocked(idx), st = save.done[s.id] || 0;
+      var label = (idx + 1) + '. ' + s.name + ', ' + s.topic + (locked ? ', lukittu' : st ? ', ' + st + ' tähteä' : '');
+      h += '<g class="isl' + (locked ? ' locked' : '') + '" data-i="' + idx + '" tabindex="0" role="button" aria-label="' + label + '"' + (locked ? ' aria-disabled="true"' : '') + '>' +
+        '<ellipse class="isl-ring" cx="' + s.x + '" cy="' + s.y + '" rx="42" ry="32"/>' +
+        '<ellipse class="isl-' + s.subj + '" cx="' + s.x + '" cy="' + s.y + '" rx="33" ry="24"/>' +
+        (st ? '<text class="isl-animal" x="' + s.x + '" y="' + (s.y + 10) + '">' + s.animal + '</text>'
+            : '<text class="isl-num" x="' + s.x + '" y="' + (s.y + 8) + '">' + (idx + 1) + '</text>') +
+        '<text class="isl-name" x="' + s.x + '" y="' + (s.y + 50) + '">' + s.name + '</text>' +
+        (st ? '<text class="isl-star" x="' + s.x + '" y="' + (s.y + 65) + '">' + starStr(st) + '</text>'
+            : '<text class="isl-sub" x="' + s.x + '" y="' + (s.y + 64) + '">' + (locked ? 'LUKITTU' : (s.subj === 'm' ? 'MATIKKA' : 'SUOMI')) + '</text>') +
+        '</g>';
+    });
+    if (next >= 0) {
+      var t = ISL[next];
+      h += '<g transform="translate(' + (t.x - 52) + ' ' + (t.y + 6) + ')"><g class="boat-in">' +
+        '<path d="M-14 0 L14 0 L9 9 L-9 9 Z" fill="var(--ink)"/><line x1="0" y1="0" x2="0" y2="-20" stroke="var(--ink)" stroke-width="2"/>' +
+        '<path d="M2 -19 L2 -3 L13 -3 Z" fill="var(--accent)" stroke="var(--accent-d)" stroke-width="1"/></g></g>';
+    }
+    mapEl.innerHTML = h;
+  }
+  function onMapActivate(el) {
+    var g = el.closest('[data-i]'); if (!g) return;
+    var i = +g.getAttribute('data-i');
+    if (!isUnlocked(i)) { hintEl.textContent = 'Tämä saari aukeaa, kun olet suorittanut saaren ' + i + ': ' + ISL[i - 1].name + '.'; return; }
+    startIsland(i);
+  }
+  mapEl.addEventListener('click', function (e) { onMapActivate(e.target); });
+  mapEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onMapActivate(e.target); } });
+
+  /* ---------- Peli ---------- */
+  var G = null;
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function fmtText(t) { return esc(t).replace('___', '<span class="blank"></span>'); }
+
+  function startIsland(i) {
+    var s = ISL[i];
+    G = { i: i, isl: s, d: 2, crates: 0, rounds: 0, mistakes: 0, used: {}, q: null, tries: 0, over: false };
+    mapView.hidden = true; gameView.hidden = false;
+    gameView.innerHTML =
+      '<div class="bar"><button class="btn" id="back" type="button">← Kartalle</button><span class="chip ' + s.subj + '">' + (s.subj === 'm' ? 'Matikka' : 'Suomen kieli') + '</span></div>' +
+      '<h2 class="isl-title">' + (i + 1) + '. ' + s.name + '<br><span class="muted" style="font:600 .95rem var(--f-body)">' + s.topic + '</span></h2>' +
+      '<div class="deck" id="deck" aria-label="Lastattu"></div><div class="hull"></div>' +
+      '<div class="card" id="card"></div>';
+    window.scrollTo(0, 0);
+    drawCrates(); nextQuestion();
+  }
+  function drawCrates() {
+    var h = '';
+    for (var k = 0; k < NEED; k++) h += '<div class="slot' + (k < G.crates ? ' on' : '') + '"></div>';
+    $('#deck').innerHTML = h;
+    $('#deck').setAttribute('aria-label', 'Laatikoita lastattu ' + G.crates + '/' + NEED);
+  }
+  /* Muuttaa numerovastauksen kolmen vaihtoehdon valinnaksi */
+  function toChoice(q) {
+    var a = q.answer, cand = shuffle([a + 10, a - 10, a + 1, a - 1, a + 2, a - 2, a + 5, a - 5, a * 2]);
+    var wr = [];
+    cand.forEach(function (x) { if (x > 0 && x !== a && wr.indexOf(x) < 0 && wr.length < 2) wr.push(x); });
+    var lab = function (n) { return n + (q.unit ? ' ' + q.unit : ''); };
+    q.answer = lab(a);
+    q.options = shuffle([a, wr[0], wr[1]].map(lab));
+    q.type = 'choice';
+    q.unit = '';
+    q.instr = 'Valitse oikea vastaus.';
+    return q;
+  }
+  function nextQuestion() {
+    var q, guard = 0;
+    do { q = G.isl.gen(G.d, G.used); guard++; } while (G.used[q.text] && guard < 12);
+    G.used[q.text] = true;
+    if (!q.type || q.type === 'num') q = toChoice(q);
+    G.q = q; G.tries = 0; G.over = false;
+    var h = (q.instr ? '<p class="instr">' + esc(q.instr) + '</p>' : '') + '<p class="q">' + fmtText(q.text) + '</p>';
+    if (q.type === 'num') {
+      h += '<form id="qform" class="ansrow" autocomplete="off"><input type="text" id="ans" inputmode="decimal" aria-label="Vastaus" autocomplete="off">' +
+        (q.unit ? '<span class="unit">' + esc(q.unit) + '</span>' : '') + '<button class="btn primary" type="submit">Tarkista</button></form>';
+    } else {
+      h += '<div class="choices">' + q.options.map(function (o) { return '<button class="choice" type="button" data-v="' + esc(o) + '">' + esc(o) + '</button>'; }).join('') + '</div>';
+    }
+    h += '<div class="fb" id="fb" role="status" aria-live="polite"></div><div class="nextrow" id="nextrow"></div>';
+    $('#card').innerHTML = h;
+    var a = $('#ans'); if (a) a.focus({ preventScroll: true });
+  }
+  function setFb(cls, txt) { var f = $('#fb'); f.className = 'fb ' + cls; f.textContent = txt; }
+  function ansLabel(q) { return q.type === 'num' ? q.answer + (q.unit ? ' ' + q.unit : '') : q.answer; }
+
+  function submit(value, btn) {
+    if (!G || G.over) return;
+    var q = G.q, ok;
+    if (q.type === 'num') {
+      var n = parseFloat(String(value).replace(',', '.').replace(/\s/g, ''));
+      if (isNaN(n)) { setFb('hint', 'Kirjoita vastaus numeroina.'); return; }
+      ok = Math.abs(n - q.answer) < 1e-9;
+    } else { ok = value === q.answer; }
+
+    if (ok) {
+      if (btn) btn.classList.add('right');
+      G.crates++;
+      if (G.tries === 0) { G.d = Math.min(3, G.d + 1); setFb('good', pick(['Oikein! Laatikko lastattu.', 'Täsmälleen! Laatikko veneeseen.', 'Hienoa, oikea vastaus! Laatikko lastattu.'])); }
+      else setFb('good', 'Oikein! Nyt se onnistui. Laatikko lastattu.');
+      endQuestion();
+    } else if (G.tries === 0) {
+      G.tries = 1; G.mistakes++; G.d = Math.max(1, G.d - 1);
+      if (btn) { btn.classList.add('wrong'); btn.disabled = true; }
+      setFb('hint', 'Ei vielä. Vihje: ' + q.hint + ' Yritä uudelleen.');
+      var a = $('#ans'); if (a) { a.select(); a.focus({ preventScroll: true }); }
+    } else {
+      G.tries = 2;
+      if (btn) { btn.classList.add('wrong'); btn.disabled = true; }
+      setFb('reveal', 'Oikea vastaus on ' + ansLabel(q) + '. ' + q.hint + ' Seuraava kysymys on uusi mahdollisuus.');
+      document.querySelectorAll('.choice').forEach(function (c) { if (c.getAttribute('data-v') === q.answer) c.classList.add('right'); });
+      endQuestion();
+    }
+  }
+  function endQuestion() {
+    G.over = true; G.rounds++;
+    drawCrates();
+    document.querySelectorAll('.choice').forEach(function (c) { c.disabled = true; });
+    var a = $('#ans'); if (a) a.disabled = true;
+    var sb = document.querySelector('#qform button'); if (sb) sb.disabled = true;
+    var fin = G.crates >= NEED || G.rounds >= MAXROUNDS;
+    $('#nextrow').innerHTML = '<button class="btn primary" id="next" type="button">' + (fin ? 'Valmis' : 'Seuraava kysymys') + '</button>';
+    $('#next').focus({ preventScroll: true });
+  }
+  function finish() {
+    var s = G.isl, stars = G.mistakes <= 1 ? 3 : (G.mistakes <= 3 ? 2 : 1);
+    if (!save.done[s.id] || save.done[s.id] < stars) save.done[s.id] = stars;
+    persist();
+    var all = ISL.every(function (x) { return save.done[x.id]; });
+    var msg = stars === 3 ? 'Lähes virheetön reitti!' : (stars === 2 ? 'Hyvä matka. Voit yrittää uudelleen kolmea tähteä varten.' : 'Pääsit perille. Harjoittele vielä, niin tähtiä tulee lisää.');
+    var hasNext = G.i < ISL.length - 1;
+    $('#deck').innerHTML = '';
+    $('#card').innerHTML = '<div class="done"><div class="animal" aria-hidden="true">' + s.animal + '</div><h2>Saari kartoitettu!</h2>' +
+      '<div class="bigstars" aria-label="' + stars + ' tähteä kolmesta">' + starStr(stars) + '</div>' +
+      '<p>Uusi asukas saarella: ' + s.animalName + '.</p><p class="muted">' + msg + '</p>' +
+      (all ? '<p><b>Koko saaristo on kartoitettu. Hyvää työtä, kartanpiirtäjä!</b></p>' : '') +
+      '<button class="btn" id="backmap" type="button">Kartalle</button>' +
+      (hasNext ? '<button class="btn primary" id="nextisl" type="button">Seuraava saari</button>' : '') + '</div>';
+    G.finished = true;
+    window.scrollTo(0, 0);
+  }
+  function toMap() {
+    G = null; gameView.hidden = true; mapView.hidden = false; gameView.innerHTML = '';
+    hintEl.textContent = 'Napauta saarta. Vastaa oikein, niin vene täyttyy viidestä laatikosta ja seuraava saari aukeaa.';
+    renderMap(); window.scrollTo(0, 0);
+  }
+
+  gameView.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.id === 'back' || t.id === 'backmap') { toMap(); return; }
+    if (t.id === 'nextisl') { startIsland(G.i + 1); return; }
+    if (t.id === 'next') { if (G.crates >= NEED || G.rounds >= MAXROUNDS) finish(); else nextQuestion(); return; }
+    if (t.classList && t.classList.contains('choice') && !t.disabled) submit(t.getAttribute('data-v'), t);
+  });
+  gameView.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var a = $('#ans'); if (a) submit(a.value, null);
+  });
+
+  /* ---------- Nollaus (vahvistus sivulla, ei selaindialogia) ---------- */
+  var resetBtn = $('#reset'), resetTimer = null;
+  resetBtn.addEventListener('click', function () {
+    if (resetBtn.getAttribute('data-arm') === '1') {
+      clearTimeout(resetTimer); resetBtn.removeAttribute('data-arm'); resetBtn.textContent = 'Aloita alusta';
+      save = { done: {} }; persist(); toMap();
+    } else {
+      resetBtn.setAttribute('data-arm', '1'); resetBtn.textContent = 'Varmista: poista tähdet';
+      resetTimer = setTimeout(function () { resetBtn.removeAttribute('data-arm'); resetBtn.textContent = 'Aloita alusta'; }, 4000);
+    }
+  });
+
+  renderMap();
+})();
+</script>
+</body>
+</html>
